@@ -96,3 +96,40 @@ export const PUT = asyncHandler(async (req: NextRequest, { params }) => {
     new ApiResponse(true, "Buyer updated successfully", updated)
   );
 });
+
+export const DELETE = asyncHandler(
+  async (req: NextRequest, { params }: { params: { id: string } }) => {
+    const { id } = await params;
+
+    // TODO: Replace with NextAuth user session
+    const currentUserId = "65424d45-1cb4-4b07-8f80-b0e1fdcd6701";
+
+    // Check if buyer exists
+    const [existing] = await db.select().from(buyers).where(eq(buyers.id, id));
+
+    if (!existing) {
+      throw new ApiError(404, "Buyer not found");
+    }
+
+    // Ownership check
+    if (existing.ownerId !== currentUserId) {
+      throw new ApiError(403, "Not authorized to delete this buyer");
+    }
+
+    // Delete buyer
+    await db.delete(buyers).where(eq(buyers.id, id));
+
+    // Insert into history (audit trail)
+    await db.insert(buyerHistory).values({
+      id: randomUUID(),
+      buyerId: existing.id,
+      changedBy: currentUserId,
+      changedAt: new Date(),
+      diff: { deleted: true, ...existing }, // store old values + mark deleted
+    });
+
+    return NextResponse.json(
+      new ApiResponse(true, "Buyer deleted successfully")
+    );
+  }
+);
