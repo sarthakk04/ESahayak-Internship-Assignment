@@ -1,0 +1,15 @@
+services:
+  db:
+    image: postgres
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: sarthak
+      POSTGRES_USER: sarthak
+      POSTGRES_DB: internship_assignment
+    ports:
+      - 5432:5432
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+volumes:
+  db_data:
