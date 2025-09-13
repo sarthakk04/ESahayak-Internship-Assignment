@@ -51,14 +51,28 @@ export default function CreateBuyerPage() {
   };
 
   return (
-    <div className="max-w-xl mx-auto p-6 bg-white shadow-lg rounded-lg mt-8">
-      <h1 className="text-2xl font-bold mb-6 text-gray-800">
-        Create New Buyer
-      </h1>
-      <form onSubmit={handleSubmit} className="space-y-5">
+    <div className="max-w-3xl mx-auto p-6 bg-gray-50 rounded-lg mt-8 shadow-md">
+      {/* Header with Back Button */}
+      <div className="flex items-center justify-between mb-6">
+        <button
+          onClick={() => router.push("/")}
+          className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
+        >
+          ← Back
+        </button>
+        <h1 className="text-2xl font-bold text-gray-800">Create New Buyer</h1>
+        <div></div>
+      </div>
+
+      <form
+        onSubmit={handleSubmit}
+        className="space-y-5 bg-white p-6 rounded-lg shadow-sm"
+      >
         {/** Full Name */}
         <div>
-          <label className="block font-semibold mb-1">Full Name</label>
+          <label className="block font-semibold mb-1 text-gray-700">
+            Full Name
+          </label>
           <input
             type="text"
             value={form.fullName || ""}
@@ -72,7 +86,9 @@ export default function CreateBuyerPage() {
 
         {/** Email */}
         <div>
-          <label className="block font-semibold mb-1">Email</label>
+          <label className="block font-semibold mb-1 text-gray-700">
+            Email
+          </label>
           <input
             type="email"
             value={form.email || ""}
@@ -84,7 +100,9 @@ export default function CreateBuyerPage() {
 
         {/** Phone */}
         <div>
-          <label className="block font-semibold mb-1">Phone</label>
+          <label className="block font-semibold mb-1 text-gray-700">
+            Phone
+          </label>
           <input
             type="text"
             value={form.phone || ""}
@@ -96,7 +114,7 @@ export default function CreateBuyerPage() {
 
         {/** City */}
         <div>
-          <label className="block font-semibold mb-1">City</label>
+          <label className="block font-semibold mb-1 text-gray-700">City</label>
           <select
             value={form.city || ""}
             onChange={(e) => handleChange("city", e.target.value)}
@@ -114,7 +132,9 @@ export default function CreateBuyerPage() {
 
         {/** Property Type */}
         <div>
-          <label className="block font-semibold mb-1">Property Type</label>
+          <label className="block font-semibold mb-1 text-gray-700">
+            Property Type
+          </label>
           <select
             value={form.propertyType || ""}
             onChange={(e) => handleChange("propertyType", e.target.value)}
@@ -134,7 +154,7 @@ export default function CreateBuyerPage() {
 
         {/** BHK */}
         <div>
-          <label className="block font-semibold mb-1">
+          <label className="block font-semibold mb-1 text-gray-700">
             BHK (if Apartment/Villa)
           </label>
           <select
@@ -154,7 +174,9 @@ export default function CreateBuyerPage() {
 
         {/** Purpose */}
         <div>
-          <label className="block font-semibold mb-1">Purpose</label>
+          <label className="block font-semibold mb-1 text-gray-700">
+            Purpose
+          </label>
           <select
             value={form.purpose || ""}
             onChange={(e) => handleChange("purpose", e.target.value)}
@@ -171,7 +193,9 @@ export default function CreateBuyerPage() {
 
         {/** Budget Min */}
         <div>
-          <label className="block font-semibold mb-1">Budget Min (INR)</label>
+          <label className="block font-semibold mb-1 text-gray-700">
+            Budget Min (INR)
+          </label>
           <input
             type="number"
             value={form.budgetMin || ""}
@@ -185,7 +209,9 @@ export default function CreateBuyerPage() {
 
         {/** Budget Max */}
         <div>
-          <label className="block font-semibold mb-1">Budget Max (INR)</label>
+          <label className="block font-semibold mb-1 text-gray-700">
+            Budget Max (INR)
+          </label>
           <input
             type="number"
             value={form.budgetMax || ""}
@@ -199,7 +225,9 @@ export default function CreateBuyerPage() {
 
         {/** Timeline */}
         <div>
-          <label className="block font-semibold mb-1">Timeline</label>
+          <label className="block font-semibold mb-1 text-gray-700">
+            Timeline
+          </label>
           <select
             value={form.timeline || ""}
             onChange={(e) => handleChange("timeline", e.target.value)}
@@ -218,7 +246,9 @@ export default function CreateBuyerPage() {
 
         {/** Source */}
         <div>
-          <label className="block font-semibold mb-1">Source</label>
+          <label className="block font-semibold mb-1 text-gray-700">
+            Source
+          </label>
           <select
             value={form.source || ""}
             onChange={(e) => handleChange("source", e.target.value)}
@@ -238,7 +268,9 @@ export default function CreateBuyerPage() {
 
         {/** Notes */}
         <div>
-          <label className="block font-semibold mb-1">Notes</label>
+          <label className="block font-semibold mb-1 text-gray-700">
+            Notes
+          </label>
           <textarea
             value={form.notes || ""}
             onChange={(e) => handleChange("notes", e.target.value)}
@@ -247,6 +279,7 @@ export default function CreateBuyerPage() {
           {errors.notes && <p className="text-red-500 mt-1">{errors.notes}</p>}
         </div>
 
+        {/* Submit Button */}
         <div className="flex justify-end">
           <button
             type="submit"
