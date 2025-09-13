@@ -1,3 +1,4 @@
+// app/api/buyers/list/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { buyers } from "@/db/schema";
@@ -5,8 +6,14 @@ import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { asyncHandler } from "@/utils/asyncHandler";
 import { ApiResponse } from "@/utils/apiResponse";
 import { ApiError } from "@/utils/apiError";
+import { auth } from "@clerk/nextjs/server";
 
 export const GET = asyncHandler(async (req: NextRequest) => {
+  const { userId } = await auth();
+  if (!userId) {
+    throw new ApiError(401, "Unauthorized");
+  }
+
   const { searchParams } = new URL(req.url);
 
   // Pagination
@@ -26,8 +33,9 @@ export const GET = asyncHandler(async (req: NextRequest) => {
   const status = searchParams.get("status");
   const timeline = searchParams.get("timeline");
 
-  // Conditions
+  // Conditions (ownership + filters)
   const conditions = and(
+    eq(buyers.ownerId, userId), // ✅ enforce ownership
     search
       ? or(
           ilike(buyers.fullName, `%${search}%`),

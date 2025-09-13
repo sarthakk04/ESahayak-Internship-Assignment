@@ -1,25 +1,27 @@
+// app/api/buyers/create/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { asyncHandler } from "@/utils/asyncHandler";
-import { ApiResponse } from "@/utils/apiResponse";
 import { ApiError } from "@/utils/apiError";
-import { buyerCreateSchema } from "@/validations/buyer";
+import { ApiResponse } from "@/utils/apiResponse";
 import { db } from "@/db";
 import { buyers } from "@/db/schema";
-import { randomUUID } from "crypto";
+import { buyerSchema } from "@/validations/buyer";
 import { eq } from "drizzle-orm";
+import { auth } from "@clerk/nextjs/server";
+import { rateLimit } from "@/utils/rateLimiter";
 
 export const POST = asyncHandler(async (req: NextRequest) => {
-  const body = await req.json();
+  const { userId } = await auth();
+  if (!userId) throw new ApiError(401, "Unauthorized");
 
-  // Validate input
-  const parsed = buyerCreateSchema.safeParse(body);
-  if (!parsed.success) {
-    throw new ApiError(400, parsed.error.issues[0].message);
+  if (!rateLimit(userId)) {
+    throw new ApiError(429, "Too many requests. Please try again later.");
   }
 
-  const { email } = parsed.data;
+  const body = await req.json();
+  const parsed = buyerSchema.parse(body);
 
-  const data = parsed.data;
+  const { email } = parsed;
 
   if (email) {
     const [existing] = await db
@@ -27,21 +29,16 @@ export const POST = asyncHandler(async (req: NextRequest) => {
       .from(buyers)
       .where(eq(buyers.email, email))
       .limit(1);
+
     if (existing) {
       throw new ApiError(400, "Buyer with this email already exists");
     }
   }
 
-  // TODO: Replace with real auth once we add NextAuth
-  const ownerId = randomUUID();
-
-  // Insert into DB
-  const [buyer] = await db
-    .insert(buyers)
-    .values({ ...data, ownerId })
-    .returning();
-
-  return NextResponse.json(new ApiResponse(true, "Buyer created", buyer), {
-    status: 201,
+  await db.insert(buyers).values({
+    ...parsed,
+    ownerId: userId, // 🔑 enforce ownership
   });
+
+  return NextResponse.json(new ApiResponse(true, "Buyer created"));
 });

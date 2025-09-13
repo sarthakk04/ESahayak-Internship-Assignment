@@ -6,11 +6,14 @@ import { parse } from "csv-parse/sync";
 import { buyerSchema } from "@/validations/buyer";
 import { db } from "@/db";
 import { buyers } from "@/db/schema";
-import { randomUUID } from "crypto";
+import { auth } from "@clerk/nextjs/server"; // 🔹 NEW
 
 export const runtime = "nodejs";
 
 export const POST = asyncHandler(async (req: NextRequest) => {
+  const { userId } = await auth();
+  if (!userId) throw new ApiError(401, "Unauthorized");
+
   const formData = await req.formData();
   const file = formData.get("file") as File | null;
 
@@ -25,21 +28,21 @@ export const POST = asyncHandler(async (req: NextRequest) => {
     columns: true,
     skip_empty_lines: true,
     trim: true,
-  });
+  }) as Record<string, unknown>[];
 
   if (records.length > 200) {
     throw new ApiError(400, "CSV cannot contain more than 200 rows");
   }
 
-  const errors: any[] = [];
-  const validRows: any[] = [];
+  const errors: { row: number; errors: unknown }[] = [];
+  const validRows: typeof buyers.$inferInsert[] = [];
 
-  records.forEach((row: any, index: number) => {
+  records.forEach((row: Record<string, unknown>, index: number) => {
     // Convert tags string → array
     const tags = row.tags
       ? String(row.tags)
           .split(",")
-          .map((t: string) => t.trim())
+          .map((t) => t.trim())
           .filter(Boolean)
       : undefined;
 
@@ -55,7 +58,7 @@ export const POST = asyncHandler(async (req: NextRequest) => {
     } else {
       validRows.push({
         ...parsed.data,
-        ownerId: randomUUID(), // TODO: replace with auth
+        ownerId: userId, // ✅ enforce ownership
       });
     }
   });

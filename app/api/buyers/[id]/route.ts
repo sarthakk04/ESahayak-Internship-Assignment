@@ -2,35 +2,45 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { buyers, buyerHistory } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { asyncHandler } from "@/utils/asyncHandler";
 import { ApiResponse } from "@/utils/apiResponse";
 import { ApiError } from "@/utils/apiError";
 import { buyerCreateSchema } from "@/validations/buyer";
 import { randomUUID } from "crypto";
+import { auth } from "@clerk/nextjs/server";
+import { rateLimit } from "@/utils/rateLimiter";
 
-export const GET = asyncHandler(async (req: NextRequest, { params }) => {
+// ------------------------- GET (any logged-in user can view) -------------------------
+export const GET = asyncHandler(async (_req: NextRequest, { params }) => {
+  const { userId } = await auth();
+  if (!userId) throw new ApiError(401, "Unauthorized");
+
   const { id } = await params;
 
-  // Fetch buyer
   const [buyer] = await db
     .select()
     .from(buyers)
     .where(eq(buyers.id, id))
     .limit(1);
 
-  if (!buyer) {
-    throw new ApiError(404, "Buyer not found");
-  }
+  if (!buyer) throw new ApiError(404, "Buyer not found");
 
   return NextResponse.json(
     new ApiResponse(true, "Buyer fetched successfully", buyer)
   );
 });
 
-// Update
-
+// ------------------------- PUT (only owner can update) -------------------------
 export const PUT = asyncHandler(async (req: NextRequest, { params }) => {
+  const { userId } = await auth();
+  if (!userId) throw new ApiError(401, "Unauthorized");
+
+  // 🔹 Rate limit check per user
+  if (!rateLimit(userId)) {
+    throw new ApiError(429, "Too many requests. Please try again later.");
+  }
+
   const { id } = await params;
   const body = await req.json();
 
@@ -41,19 +51,16 @@ export const PUT = asyncHandler(async (req: NextRequest, { params }) => {
   }
   const data = parsed.data;
 
-  // TODO :  Simulate auth (replace with real auth later)
-  const currentUserId = randomUUID();
-
   // Fetch existing buyer
-  const [existing] = await db.select().from(buyers).where(eq(buyers.id, id));
-  if (!existing) throw new ApiError(404, "Buyer not found");
+  const [existing] = await db
+    .select()
+    .from(buyers)
+    .where(and(eq(buyers.id, id), eq(buyers.ownerId, userId))) // 🔒 ownership check
+    .limit(1);
 
-  // Ownership check
-  if (existing.ownerId !== currentUserId) {
-    throw new ApiError(403, "You can only update your own leads");
-  }
+  if (!existing) throw new ApiError(403, "Not authorized to update this buyer");
 
-  //  Concurrency check
+  // Concurrency check
   if (body.updatedAt && body.updatedAt !== existing.updatedAt.toISOString()) {
     throw new ApiError(
       409,
@@ -61,8 +68,9 @@ export const PUT = asyncHandler(async (req: NextRequest, { params }) => {
     );
   }
 
-  //  Diff for history
-  const diff: Record<string, any> = {};
+  // Diff for history
+
+  const diff: Record<string, { old: unknown; new: unknown }> = {};
   for (const key in data) {
     if (
       data[key as keyof typeof data] !== existing[key as keyof typeof existing]
@@ -86,7 +94,7 @@ export const PUT = asyncHandler(async (req: NextRequest, { params }) => {
     await db.insert(buyerHistory).values({
       id: randomUUID(),
       buyerId: id,
-      changedBy: currentUserId,
+      changedBy: userId,
       changedAt: new Date(),
       diff,
     });
@@ -97,39 +105,39 @@ export const PUT = asyncHandler(async (req: NextRequest, { params }) => {
   );
 });
 
-export const DELETE = asyncHandler(
-  async (req: NextRequest, { params }: { params: { id: string } }) => {
-    const { id } = await params;
+// ------------------------- DELETE (only owner can delete) -------------------------
+export const DELETE = asyncHandler(async (_req: NextRequest, { params }) => {
+  const { userId } = await auth();
+  if (!userId) throw new ApiError(401, "Unauthorized");
 
-    // TODO: Replace with NextAuth user session
-    const currentUserId = "65424d45-1cb4-4b07-8f80-b0e1fdcd6701";
-
-    // Check if buyer exists
-    const [existing] = await db.select().from(buyers).where(eq(buyers.id, id));
-
-    if (!existing) {
-      throw new ApiError(404, "Buyer not found");
-    }
-
-    // Ownership check
-    if (existing.ownerId !== currentUserId) {
-      throw new ApiError(403, "Not authorized to delete this buyer");
-    }
-
-    // Delete buyer
-    await db.delete(buyers).where(eq(buyers.id, id));
-
-    // Insert into history (audit trail)
-    await db.insert(buyerHistory).values({
-      id: randomUUID(),
-      buyerId: existing.id,
-      changedBy: currentUserId,
-      changedAt: new Date(),
-      diff: { deleted: true, ...existing }, // store old values + mark deleted
-    });
-
-    return NextResponse.json(
-      new ApiResponse(true, "Buyer deleted successfully")
-    );
+  // 🔹 Rate limit check per user
+  if (!rateLimit(userId)) {
+    throw new ApiError(429, "Too many requests. Please try again later.");
   }
-);
+
+  const { id } = await params;
+
+  const [existing] = await db
+    .select()
+    .from(buyers)
+    .where(and(eq(buyers.id, id), eq(buyers.ownerId, userId)))
+    .limit(1);
+
+  if (!existing) {
+    throw new ApiError(403, "Not authorized to delete this buyer");
+  }
+
+  // Delete buyer
+  await db.delete(buyers).where(eq(buyers.id, id));
+
+  // Insert into history (audit trail)
+  await db.insert(buyerHistory).values({
+    id: randomUUID(),
+    buyerId: existing.id,
+    changedBy: userId,
+    changedAt: new Date(),
+    diff: { deleted: true, ...existing }, // store old values + mark deleted
+  });
+
+  return NextResponse.json(new ApiResponse(true, "Buyer deleted successfully"));
+});

@@ -67,7 +67,7 @@ export const buyers = pgTable("buyers", {
   notes: text("notes"),
   tags: text("tags").array(),
   status: statusEnum("status").default("New").notNull(),
-  ownerId: uuid("owner_id").notNull(),
+  ownerId: text("owner_id").notNull(),
   updatedAt: timestamp("updated_at")
     .default(sql`now()`)
     .notNull(),
@@ -77,7 +77,7 @@ export const buyers = pgTable("buyers", {
 export const buyerHistory = pgTable("buyer_history", {
   id: uuid("id").defaultRandom().primaryKey(),
   buyerId: uuid("buyer_id").notNull(),
-  changedBy: uuid("changed_by").notNull(),
+  changedBy: text("changed_by").notNull(),
   changedAt: timestamp("changed_at")
     .default(sql`now()`)
     .notNull(),

@@ -1,12 +1,16 @@
-// app/api/buyers/export/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { buyers } from "@/db/schema";
 import { and, desc, eq, ilike, or } from "drizzle-orm";
 import { asyncHandler } from "@/utils/asyncHandler";
 import { stringify } from "csv-stringify/sync";
+import { auth } from "@clerk/nextjs/server"; // 🔹 NEW
+import { ApiError } from "@/utils/apiError"; // 🔹 NEW
 
 export const GET = asyncHandler(async (req: NextRequest) => {
+  const { userId } = await auth();
+  if (!userId) throw new ApiError(401, "Unauthorized");
+
   const { searchParams } = new URL(req.url);
 
   // Filters
@@ -18,6 +22,7 @@ export const GET = asyncHandler(async (req: NextRequest) => {
 
   // Conditions
   const conditions = and(
+    eq(buyers.ownerId, userId), // ✅ ownership enforcement
     search
       ? or(
           ilike(buyers.fullName, `%${search}%`),
@@ -25,14 +30,28 @@ export const GET = asyncHandler(async (req: NextRequest) => {
           ilike(buyers.phone, `%${search}%`)
         )
       : undefined,
-    city ? eq(buyers.city, city as "Chandigarh" | "Mohali" | "Zirakpur" | "Panchkula" | "Other") : undefined,
+    city
+      ? eq(
+          buyers.city,
+          city as "Chandigarh" | "Mohali" | "Zirakpur" | "Panchkula" | "Other"
+        )
+      : undefined,
     propertyType
       ? eq(
           buyers.propertyType,
           propertyType as "Apartment" | "Villa" | "Plot" | "Office" | "Retail"
         )
       : undefined,
-    status && ["New", "Qualified", "Contacted", "Visited", "Negotiation", "Converted", "Dropped"].includes(status)
+    status &&
+      [
+        "New",
+        "Qualified",
+        "Contacted",
+        "Visited",
+        "Negotiation",
+        "Converted",
+        "Dropped",
+      ].includes(status)
       ? eq(
           buyers.status,
           status as
@@ -58,26 +77,32 @@ export const GET = asyncHandler(async (req: NextRequest) => {
     .orderBy(desc(buyers.updatedAt));
 
   // Convert to CSV
-  const csv = stringify(data, {
-    header: true,
-    columns: [
-      "fullName",
-      "email",
-      "phone",
-      "city",
-      "propertyType",
-      "bhk",
-      "purpose",
-      "budgetMin",
-      "budgetMax",
-      "timeline",
-      "source",
-      "notes",
-      "tags",
-      "status",
-      "updatedAt",
-    ],
-  });
+  const csv = stringify(
+    data.map((row) => ({
+      ...row,
+      tags: Array.isArray(row.tags) ? row.tags.join(", ") : row.tags || "",
+    })),
+    {
+      header: true,
+      columns: [
+        "fullName",
+        "email",
+        "phone",
+        "city",
+        "propertyType",
+        "bhk",
+        "purpose",
+        "budgetMin",
+        "budgetMax",
+        "timeline",
+        "source",
+        "notes",
+        "tags",
+        "status",
+        "updatedAt",
+      ],
+    }
+  );
 
   return new NextResponse(csv, {
     headers: {
